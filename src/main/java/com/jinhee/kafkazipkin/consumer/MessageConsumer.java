@@ -17,12 +17,14 @@ import java.util.Properties;
 
 public class MessageConsumer {
     private static final Integer TIMEOUT = 500;
+    private  String name;
     private Consumer<Long, String> tracingConsumer;
     private KafkaTracing kafkaTracing;
 
-    public MessageConsumer() {
+    public MessageConsumer(String name) {
+        this.name = name;
         this.kafkaTracing = KafkaTracing.create(Tracing.newBuilder()
-                                                       .localServiceName("consumer1")
+                                                       .localServiceName(name)
                                                        .currentTraceContext(new StrictCurrentTraceContext())
                                                        .spanReporter(AsyncReporter.create(URLConnectionSender.create(
                                                            "http://127.0.0.1:9411/api/v2/spans")))
@@ -33,24 +35,24 @@ public class MessageConsumer {
 
     public void consume() {
         ConsumerRecords<Long, String> records = tracingConsumer.poll(TIMEOUT);
-        records.forEach(record -> process(record));
+        records.forEach(this::process);
         tracingConsumer.commitSync();
     }
 
     private void process(ConsumerRecord<Long, String> record) {
-        brave.Span span = kafkaTracing.nextSpan(record).name("Consumer1_Processing").start();
+        brave.Span span = kafkaTracing.nextSpan(record).name("doSomething").start();
         doSomething(record);
         span.finish();
     }
 
     private void doSomething(ConsumerRecord<Long, String> record) {
-        System.out.println("consume "+ record.headers());
+        System.out.println("consume and process a message " + record);
     }
 
     private Properties getConsumerProperties() {
         Properties properties = new Properties();
         properties.put("bootstrap.servers", "127.0.0.1:9092");
-        properties.put("group.id", "zipkin-consumer1");
+        properties.put("group.id", "zipkin-" + name);
         properties.put("enable.auto.commit", "false");
         properties.put("auto.offset.reset", "earliest");
         properties.put("key.deserializer", LongDeserializer.class.getName());
