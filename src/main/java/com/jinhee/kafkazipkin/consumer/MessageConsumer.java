@@ -1,6 +1,5 @@
 package com.jinhee.kafkazipkin.consumer;
 
-import brave.Tracer;
 import brave.Tracing;
 import brave.kafka.clients.KafkaTracing;
 import brave.propagation.StrictCurrentTraceContext;
@@ -10,57 +9,42 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.LongDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import zipkin2.Span;
+import zipkin2.reporter.AsyncReporter;
+import zipkin2.reporter.urlconnection.URLConnectionSender;
 
 import java.util.Collections;
 import java.util.Properties;
-import java.util.concurrent.ConcurrentLinkedDeque;
 
-public class FirstMessageConsumer {
+public class MessageConsumer {
     private static final Integer TIMEOUT = 500;
     private Consumer<Long, String> tracingConsumer;
     private KafkaTracing kafkaTracing;
-    private Tracing tracing;
 
-    public FirstMessageConsumer() {
-        ConcurrentLinkedDeque<Span> spans = new ConcurrentLinkedDeque<>();
-        this.tracing = Tracing.newBuilder()
-                                 .currentTraceContext(new StrictCurrentTraceContext())
-                                 .spanReporter(spans::add)
-                                 .build();
-        this.kafkaTracing = KafkaTracing.newBuilder(tracing)
-                                        .remoteServiceName("consumer1")
-                                        .build();
+    public MessageConsumer() {
+        this.kafkaTracing = KafkaTracing.create(Tracing.newBuilder()
+                                                       .localServiceName("consumer1")
+                                                       .currentTraceContext(new StrictCurrentTraceContext())
+                                                       .spanReporter(AsyncReporter.create(URLConnectionSender.create(
+                                                           "http://127.0.0.1:9411/api/v2/spans")))
+                                                       .build());
         this.tracingConsumer = kafkaTracing.consumer(new KafkaConsumer<>(getConsumerProperties()));
         tracingConsumer.subscribe(Collections.singleton("testTopic"));
     }
 
     public void consume() {
         ConsumerRecords<Long, String> records = tracingConsumer.poll(TIMEOUT);
-//        for (ConsumerRecord<Long, String> record : records) {
-//            Span span = kafkaTracing.nextSpan(record).name("consumeFromConsumer1").start();
-//            System.out.println("컨슘 "+ record.headers());
-//        }
         records.forEach(record -> process(record));
         tracingConsumer.commitSync();
     }
 
     private void process(ConsumerRecord<Long, String> record) {
-        System.out.println("컨슘 "+ record.headers());
-        brave.Span span = kafkaTracing.nextSpan(record).name("consumeFromConsumer1").start();
-
-        try (Tracer.SpanInScope ws = tracing.tracer().withSpanInScope(span)) { // so logging can see trace ID
-            doProcess(record); // do the actual work
-        } catch (RuntimeException | Error e) {
-            span.error(e); // make sure any error gets into the span before it is finished
-            throw e;
-        } finally {
-            span.finish(); // ensure the span representing this processing completes.
-        }
+        brave.Span span = kafkaTracing.nextSpan(record).name("Consumer1_Processing").start();
+        doSomething(record);
+        span.finish();
     }
 
-    private void doProcess(ConsumerRecord<Long, String> record) {
-        System.out.println("컨슘 "+ record.headers());
+    private void doSomething(ConsumerRecord<Long, String> record) {
+        System.out.println("consume "+ record.headers());
     }
 
     private Properties getConsumerProperties() {

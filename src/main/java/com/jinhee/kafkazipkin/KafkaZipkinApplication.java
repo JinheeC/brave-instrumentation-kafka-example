@@ -1,6 +1,6 @@
 package com.jinhee.kafkazipkin;
 
-import com.jinhee.kafkazipkin.consumer.FirstMessageConsumer;
+import com.jinhee.kafkazipkin.consumer.MessageConsumer;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -9,10 +9,10 @@ public class KafkaZipkinApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(KafkaZipkinApplication.class, args);
-        FirstMessageConsumer firstMessageConsumer = new FirstMessageConsumer();
+        MessageConsumer messageConsumer = new MessageConsumer();
 
         while (true) {
-            firstMessageConsumer.consume();
+            messageConsumer.consume();
         }
     }
 }

@@ -9,10 +9,10 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.LongSerializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.stereotype.Component;
-import zipkin2.Span;
+import zipkin2.reporter.AsyncReporter;
+import zipkin2.reporter.urlconnection.URLConnectionSender;
 
 import java.util.Properties;
-import java.util.concurrent.ConcurrentLinkedDeque;
 
 @Component
 public class MessageProducer {
@@ -20,20 +20,17 @@ public class MessageProducer {
     private Producer<Long, String> tracingProducer;
 
     public MessageProducer() {
-        ConcurrentLinkedDeque<Span> spans = new ConcurrentLinkedDeque<>();
-        Tracing tracing = Tracing.newBuilder()
-                                 .currentTraceContext(new StrictCurrentTraceContext())
-                                 .spanReporter(spans::add)
-                                 .build();
-
-        KafkaTracing kafkaTracing = KafkaTracing.newBuilder(tracing)
-                                        .remoteServiceName("producer1")
-                                        .build();
+        KafkaTracing kafkaTracing = KafkaTracing.create(Tracing.newBuilder()
+                                                               .localServiceName("producer1")
+                                                               .currentTraceContext(new StrictCurrentTraceContext())
+                                                               .spanReporter(AsyncReporter.create(URLConnectionSender.create(
+                                                                   "http://127.0.0.1:9411/api/v2/spans")))
+                                                               .build());
         this.tracingProducer = kafkaTracing.producer(new KafkaProducer<>(getProducerProperties()));
     }
 
     public void sendMessage() {
-        tracingProducer.send(new ProducerRecord<>("testTopic", id++, "테스트 메세지 입니다."));
+        tracingProducer.send(new ProducerRecord<>("testTopic", id++, "This is a test message."));
     }
 
     private Properties getProducerProperties() {

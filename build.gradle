@@ -29,6 +29,7 @@ dependencies {
     compile('org.springframework.boot:spring-boot-starter-web')
     compile('org.springframework.kafka:spring-kafka')
     compile group: 'io.zipkin.brave', name: 'brave-instrumentation-kafka-clients', version: '5.1.2'
+    compile group: 'io.zipkin.reporter2', name: 'zipkin-sender-urlconnection', version: '2.7.6'
 
     compile "org.springframework.cloud:spring-cloud-starter-zipkin"
     compileOnly('org.projectlombok:lombok')
